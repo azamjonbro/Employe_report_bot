@@ -269,5 +269,5 @@ bot.onText("kelmadim", (msg) => {
     handleReason(msg, reason);
 });
 bot.onText("day", sendDailyReport);
-bot.onText("monthly", sendMonthlyReportToAdmin);
+bot.onText("monthly", sendMonthReport);
 bot.onText("Hisobot", sendWorkerList);
