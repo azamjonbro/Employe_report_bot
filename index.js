@@ -9,7 +9,6 @@ const ADMIN_ID = '6672988695'; // Admin Telegram foydalanuvchi ID'sini shu yerga
 const databasePath = './attendance.json';
 const bot = new TelegramBot(TOKEN, { polling: true });
 
-// JSON bazasi bilan ishlash
 async function loadDatabase() {
     try {
         const data = await fs.readFile(databasePath, 'utf8');
@@ -36,7 +35,6 @@ async function handleArrival(msg) {
 
     let database = await loadDatabase();
 
-    // Foydalanuvchi ma'lumotlarini tayyorlash
     if (!database[userId]) {
         database[userId] = {
             name: msg.from.first_name || '',
@@ -46,32 +44,27 @@ async function handleArrival(msg) {
     }
 
     if (!database[userId].attendance[today]) {
-        // 08:00 vaqtini olish
         const standardArrivalTime = new Date(`${today}T08:00:00`);
         const arrivalTime = new Date(`${today}T${time}`);
-
-        // Farqni hisoblash
-        const timeDifference = (arrivalTime - standardArrivalTime) / 60000; // Millisekundni minutga o‘tkazish
+        const timeDifference = (arrivalTime - standardArrivalTime) / 60000;
         let lateBy = '';
         let earlyBy = '';
 
         if (timeDifference > 0) {
-            lateBy = formatDuration(timeDifference * 60000); // Kech qolgan vaqtni formatlash
+            lateBy = formatDuration(timeDifference * 60000);
         } else if (timeDifference < 0) {
-            earlyBy = formatDuration(-timeDifference * 60000); // Erta kelgan vaqtni formatlash
+            earlyBy = formatDuration(-timeDifference * 60000);
         }
 
-        // Ma'lumotlarni bazaga yozish
         database[userId].attendance[today] = {
             kelgan_vaqti: time,
-            ketgan_vaqti: "",
+            ketgan_vaqti: '',
             kech_qolgan_vaqti: lateBy,
             erta_kelgan_vaqti: earlyBy,
-            qoshimcha_ishlangan_vaqt: "",
-            kelmaganlik_sababi: ""
+            qoshimcha_ishlangan_vaqt: '',
+            kelmaganlik_sababi: ''
         };
 
-        // Xabarni yuborish
         let message = `${msg.from.first_name} kelgan vaqti saqlandi: ${time}`;
         if (lateBy) {
             message += `\nSiz ${lateBy} kech qoldingiz.`;
@@ -85,7 +78,6 @@ async function handleArrival(msg) {
 
     await saveDatabase(database);
 }
-
 
 // Ketgan vaqti bilan ishlash
 async function handleDeparture(msg) {
@@ -104,9 +96,9 @@ async function handleDeparture(msg) {
     const kelganVaqti = database[userId].attendance[today].kelgan_vaqti;
     const kelganTime = new Date(`${today}T${kelganVaqti}`);
     const ketganTime = new Date(`${today}T${time}`);
-    const workDuration = (ketganTime - kelganTime) / 60000; // Minutes
+    const workDuration = (ketganTime - kelganTime) / 60000;
 
-    let qoshimchaIshVaqti = "";
+    let qoshimchaIshVaqti = '';
     if (ketganTime > new Date(`${today}T20:00:00`)) {
         qoshimchaIshVaqti = formatDuration(ketganTime - new Date(`${today}T20:00:00`));
     }
@@ -119,48 +111,151 @@ async function handleDeparture(msg) {
     bot.sendMessage(GROUP_CHAT_ID, `${msg.from.first_name} ketgan vaqti saqlandi: ${time}`);
 }
 
-// Kelmaganlik sababini yozish
-async function handleReason(msg, reason) {
-    const now = new Date();
-    const today = now.toISOString().split('T')[0];
+// Kunlik hisobotni guruh uchun yuborish
+async function sendDailyReport(msg) {
     const userId = msg.from.id.toString();
 
-    let database = await loadDatabase();
-
-    if (!database[userId] || !database[userId].attendance[today]) {
-        bot.sendMessage(GROUP_CHAT_ID, `${msg.from.first_name}, avval /keldim habarini yuboring.`);
+    if (!isAdmin(userId)) {
+        bot.sendMessage(userId, "Sizda bu buyruqni bajarish huquqi yo'q.");
         return;
     }
 
-    database[userId].attendance[today].kelmaganlik_sababi = reason;
-    await saveDatabase(database);
-
-    bot.sendMessage(GROUP_CHAT_ID, `${msg.from.first_name} kelmaganlik sababini saqladi: ${reason}`);
-}
-
-// Hisobotni shakllantirish va yuborish
-async function sendDailyReport() {
     const today = new Date().toISOString().split('T')[0];
-    let database = await loadDatabase();
+    const database = await loadDatabase();
 
-    const report = Object.keys(database).map(userId => {
+    let report = `📋 *Bugungi hisobot (${today}):*\n`;
+
+    for (const userId in database) {
         const user = database[userId];
         const attendance = user.attendance[today] || {};
-        return `${user.name}: Kelgan - ${attendance.kelgan_vaqti || 'Noma\'lum'}, Ketgan - ${attendance.ketgan_vaqti || 'Noma\'lum'}`;
-    }).join('\n');
+        report += `
+👤 *${user.name}*:
+  ⏰ Kelgan: ${attendance.kelgan_vaqti || '❓ Noma\'lum'}
+  🕒 Ketgan: ${attendance.ketgan_vaqti || '❓ Noma\'lum'}
+  🚶‍♂️ Kech qolgan: ${attendance.kech_qolgan_vaqti || '✅ Yo‘q'}
+  🕓 Erta ketgan: ${attendance.erta_kelgan_vaqti || '✅ Yo‘q'}
+  🏢 Qo‘shimcha ish: ${attendance.qoshimcha_ishlangan_vaqt || '✅ Yo‘q'}
+        `;
+    }
 
-    bot.sendMessage(GROUP_CHAT_ID, `Bugungi hisobot:\n${report}`);
+    bot.sendMessage(GROUP_CHAT_ID, report, { parse_mode: "Markdown" });
 }
 
-// Vaqtni formatlash yordamchi funksiyasi
-function formatDuration(milliseconds) {
-    const totalMinutes = Math.floor(milliseconds / 60000);
-    const hours = Math.floor(totalMinutes / 60);
-    const minutes = totalMinutes % 60;
-    return `${hours} soat ${minutes} daqiqa`;
+// Oylik hisobotni yuborish
+async function sendMonthlyReport(msg) {
+    const userId = msg.from.id.toString();
+
+    if (!isAdmin(userId)) {
+        bot.sendMessage(userId, "Sizda bu buyruqni bajarish huquqi yo'q.");
+        return;
+    }
+
+    const database = await loadDatabase();
+    const now = new Date();
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+    let report = `📋 *Oylik hisobot (${currentMonth}):*\n`;
+
+    for (const userId in database) {
+        const user = database[userId];
+        const monthlyAttendance = Object.entries(user.attendance)
+            .filter(([date]) => date.startsWith(currentMonth))
+            .map(([date, attendance]) => `
+📅 ${date}:
+  ⏰ Kelgan: ${attendance.kelgan_vaqti || '❓ Noma\'lum'}
+  🕒 Ketgan: ${attendance.ketgan_vaqti || '❓ Noma\'lum'}
+  🚶‍♂️ Kech qolgan: ${attendance.kech_qolgan_vaqti || '✅ Yo‘q'}
+  🕓 Erta ketgan: ${attendance.erta_kelgan_vaqti || '✅ Yo‘q'}
+  🏢 Qo‘shimcha ish: ${attendance.qoshimcha_ishlangan_vaqt || '✅ Yo‘q'}
+            `).join('');
+
+        if (monthlyAttendance) {
+            report += `
+👤 *${user.name}*:
+${monthlyAttendance}
+            `;
+        }
+    }
+
+    bot.sendMessage(userId, report, { parse_mode: "Markdown" });
 }
 
-// Ishchilar ro‘yxatini chiqarish
+// Foydalanuvchi ro‘yxatini chiqarish
+async function sendWorkerList(msg) {
+    const userId = msg.from.id.toString();
+    if (!isAdmin(userId)) {
+        bot.sendMessage(userId, "Kechirasiz, sizda bu buyruqdan foydalanish huquqi yo‘q.");
+        return;
+    }
+
+    const database = await loadDatabase();
+    const workerButtons = Object.keys(database).map(workerId => ({
+        text: database[workerId].name,
+        callback_data: `worker_${workerId}`
+    }));
+
+    const replyMarkup = {
+        inline_keyboard: workerButtons.map(button => [button])
+    };
+
+    bot.sendMessage(userId, "Ishchilar ro‘yxati:", { reply_markup: replyMarkup });
+}
+
+// Hisobot tugmalari bilan ishlash
+bot.on('callback_query', async (callbackQuery) => {
+    const data = callbackQuery.data;
+    const userId = callbackQuery.from.id.toString();
+
+    if (!isAdmin(userId)) {
+        bot.answerCallbackQuery(callbackQuery.id, "Sizda bu amalni bajarish huquqi yo‘q.");
+        return;
+    }
+
+    if (data.startsWith('worker_')) {
+        const selectedWorkerId = data.split('_')[1];
+
+        const reportButtons = [
+            { text: "Kunlik hisobot", callback_data: `day_${selectedWorkerId}` },
+            { text: "Oylik hisobot", callback_data: `month_${selectedWorkerId}` }
+        ];
+
+        const replyMarkup = {
+            inline_keyboard: [reportButtons]
+        };
+
+        bot.editMessageText("Hisobot turini tanlang:", {
+            chat_id: callbackQuery.message.chat.id,
+            message_id: callbackQuery.message.message_id,
+            reply_markup: replyMarkup
+        });
+    } else if (data.startsWith('day_')) {
+        const selectedWorkerId = data.split('_')[1];
+        await sendDayReport(userId, selectedWorkerId);
+    } else if (data.startsWith('month_')) {
+        const selectedWorkerId = data.split('_')[1];
+        await sendMonthReport(userId, selectedWorkerId);
+    }
+});
+
+// Qo'llab-quvvatlash funksiyalari
+function isAdmin(userId) {
+    return userId === ADMIN_ID;
+}
+
+function formatDuration(ms) {
+    const minutes = Math.floor(ms / 60000);
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    return `${hours} soat ${remainingMinutes} daqiqa`;
+}
+
+// Buyruqlarni sozlash
+bot.onText(/\/keldim/, handleArrival);
+bot.onText(/\/ketdim/, handleDeparture);
+bot.onText(/\/day/, sendDailyReport);
+bot.onText(/\/monthly/, sendMonthlyReport);
+bot.onText(/\/hisobot/, sendWorkerList);
+
 async function sendWorkerList(msg) {
     const userId = msg.from.id.toString();
     if (!isAdmin(userId)) {
