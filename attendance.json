@@ -1,0 +1,52 @@
+{
+  "6672988695": {
+    "name": "Azamjon Bro",
+    "username": "azamjonbroo",
+    "attendance": {
+      "2024-11-27": {
+        "kelgan_vaqti": "05:26:36",
+        "ketgan_vaqti": "12:18:04",
+        "kech_qolgan_vaqti": "",
+        "erta_kelgan_vaqti": "2 soat 33 daqiqa",
+        "qoshimcha_ishlangan_vaqt": "",
+        "kelmaganlik_sababi": "",
+        "erta_ketgan_vaqti": "7 soat 41 daqiqa",
+        "kech_ketgan_vaqti": ""
+      },
+      "2024-11-28": {
+        "kelgan_vaqti": "12:18:36",
+        "ketgan_vaqti": "12:18:43",
+        "kech_qolgan_vaqti": "4 soat 18 daqiqa",
+        "erta_kelgan_vaqti": "",
+        "qoshimcha_ishlangan_vaqt": "",
+        "kelmaganlik_sababi": "",
+        "erta_ketgan_vaqti": "7 soat 41 daqiqa",
+        "kech_ketgan_vaqti": ""
+      },
+      "2024-11-29": {
+        "kelgan_vaqti": "12:19:08",
+        "ketgan_vaqti": "12:19:17",
+        "kech_qolgan_vaqti": "4 soat 19 daqiqa",
+        "erta_kelgan_vaqti": "",
+        "qoshimcha_ishlangan_vaqt": "",
+        "kelmaganlik_sababi": "",
+        "erta_ketgan_vaqti": "7 soat 40 daqiqa",
+        "kech_ketgan_vaqti": ""
+      }
+    }
+  },
+  "5485115690": {
+    "name": "Azamjonbro",
+    "username": "azamjonbro",
+    "attendance": {
+      "2024-11-29": {
+        "kelgan_vaqti": "12:52:55",
+        "ketgan_vaqti": "",
+        "kech_qolgan_vaqti": "4 soat 52 daqiqa",
+        "erta_kelgan_vaqti": "",
+        "qoshimcha_ishlangan_vaqt": "",
+        "kelmaganlik_sababi": ""
+      }
+    }
+  }
+}
