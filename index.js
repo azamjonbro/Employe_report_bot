@@ -3,9 +3,9 @@ const fs = require('fs').promises;
 const schedule = require('node-schedule');
 
 // Bot uchun sozlamalar
-const TOKEN = '7553731592:AAGe0e4MWb0y-bYQekw_vPPe5s-h6ezliV0';
-const GROUP_CHAT_ID = '-4522225596'; // Guruh chat ID
-const ADMIN_ID = '6672988695'; // Admin Telegram foydalanuvchi ID'sini shu yerga qo‘ying
+const TOKEN = '7595945428:AAF1jngsurhhbqHqhBJDVeVSq00xEHzDXsY';
+const GROUP_CHAT_ID = '-1002401400816'; // Guruh chat ID
+const ADMIN_ID = '5011116923'; 
 const databasePath = './attendance.json';
 const bot = new TelegramBot(TOKEN, { polling: true });
 
@@ -64,14 +64,6 @@ async function handleArrival(msg) {
             qoshimcha_ishlangan_vaqt: '',
             kelmaganlik_sababi: ''
         };
-
-        let message = `${msg.from.first_name} kelgan vaqti saqlandi: ${time}`;
-        if (lateBy) {
-            message += `\nSiz ${lateBy} kech qoldingiz.`;
-        } else if (earlyBy) {
-            message += `\nSiz ${earlyBy} erta keldingiz.`;
-        }
-        bot.sendMessage(GROUP_CHAT_ID, message);
     } else {
         bot.sendMessage(GROUP_CHAT_ID, `${msg.from.first_name}, kelgan vaqtingiz allaqachon saqlangan.`);
     }
@@ -99,16 +91,19 @@ async function handleDeparture(msg) {
     const workDuration = (ketganTime - kelganTime) / 60000;
 
     let qoshimchaIshVaqti = '';
+    let  erta_kelgan_vaqti = ""
     if (ketganTime > new Date(`${today}T20:00:00`)) {
         qoshimchaIshVaqti = formatDuration(ketganTime - new Date(`${today}T20:00:00`));
     }
+    if (ketganTime < new Date(`${today}T20:00:00`)) {
+        erta_kelgan_vaqti = formatDuration(ketganTime - new Date(`${today}T20:00:00`));
+    }
 
     database[userId].attendance[today].ketgan_vaqti = time;
+    database[userId].attendance[today].erta_kelgan_vaqti=erta_kelgan_vaqti
     database[userId].attendance[today].qoshimcha_ishlangan_vaqt = qoshimchaIshVaqti;
 
     await saveDatabase(database);
-
-    bot.sendMessage(GROUP_CHAT_ID, `${msg.from.first_name} ketgan vaqti saqlandi: ${time}`);
 }
 
 // Kunlik hisobotni guruh uchun yuborish
@@ -132,52 +127,13 @@ async function sendDailyReport(msg) {
 👤 *${user.name}*:
   ⏰ Kelgan: ${attendance.kelgan_vaqti || '❓ Noma\'lum'}
   🕒 Ketgan: ${attendance.ketgan_vaqti || '❓ Noma\'lum'}
-  🚶‍♂️ Kech qolgan: ${attendance.kech_qolgan_vaqti || '✅ Yo‘q'}
-  🕓 Erta ketgan: ${attendance.erta_kelgan_vaqti || '✅ Yo‘q'}
-  🏢 Qo‘shimcha ish: ${attendance.qoshimcha_ishlangan_vaqt || '✅ Yo‘q'}
+  🚶‍♂️ Kech qolgan: ${attendance.kech_qolgan_vaqti || '❓ Yo‘q'}
+  🕓 Erta ketgan: ${attendance.erta_kelgan_vaqti || '❓ Yo‘q'}
+  🏢 Qo‘shimcha ish: ${attendance.qoshimcha_ishlangan_vaqt || '❓ Yo‘q'}
         `;
     }
 
-    bot.sendMessage(GROUP_CHAT_ID, report, { parse_mode: "Markdown" });
-}
-
-// Oylik hisobotni yuborish
-async function sendMonthlyReport(msg) {
-    const userId = msg.from.id.toString();
-
-    if (!isAdmin(userId)) {
-        bot.sendMessage(userId, "Sizda bu buyruqni bajarish huquqi yo'q.");
-        return;
-    }
-
-    const database = await loadDatabase();
-    const now = new Date();
-    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-
-    let report = `📋 *Oylik hisobot (${currentMonth}):*\n`;
-
-    for (const userId in database) {
-        const user = database[userId];
-        const monthlyAttendance = Object.entries(user.attendance)
-            .filter(([date]) => date.startsWith(currentMonth))
-            .map(([date, attendance]) => `
-📅 ${date}:
-  ⏰ Kelgan: ${attendance.kelgan_vaqti || '❓ Noma\'lum'}
-  🕒 Ketgan: ${attendance.ketgan_vaqti || '❓ Noma\'lum'}
-  🚶‍♂️ Kech qolgan: ${attendance.kech_qolgan_vaqti || '✅ Yo‘q'}
-  🕓 Erta ketgan: ${attendance.erta_kelgan_vaqti || '✅ Yo‘q'}
-  🏢 Qo‘shimcha ish: ${attendance.qoshimcha_ishlangan_vaqt || '✅ Yo‘q'}
-            `).join('');
-
-        if (monthlyAttendance) {
-            report += `
-👤 *${user.name}*:
-${monthlyAttendance}
-            `;
-        }
-    }
-
-    bot.sendMessage(userId, report, { parse_mode: "Markdown" });
+    bot.sendMessage(ADMIN_ID, report, { parse_mode: "Markdown" });
 }
 
 // Foydalanuvchi ro‘yxatini chiqarish
@@ -248,14 +204,6 @@ function formatDuration(ms) {
     const remainingMinutes = minutes % 60;
     return `${hours} soat ${remainingMinutes} daqiqa`;
 }
-
-// Buyruqlarni sozlash
-bot.onText(/\/keldim/, handleArrival);
-bot.onText(/\/ketdim/, handleDeparture);
-bot.onText(/\/day/, sendDailyReport);
-bot.onText(/\/monthly/, sendMonthlyReport);
-bot.onText(/\/hisobot/, sendWorkerList);
-
 async function sendWorkerList(msg) {
     const userId = msg.from.id.toString();
     if (!isAdmin(userId)) {
@@ -276,7 +224,6 @@ async function sendWorkerList(msg) {
     bot.sendMessage(userId, "Ishchilar ro‘yxati:", { reply_markup: replyMarkup });
 }
 
-// Tugmalarni qayta ishlash
 bot.on('callback_query', async (callbackQuery) => {
     const data = callbackQuery.data;
     const userId = callbackQuery.from.id.toString();
@@ -335,7 +282,7 @@ async function sendDayReport(adminId, workerId) {
 
 async function sendMonthReport(adminId, workerId) {
     const database = await loadDatabase();
-    const currentMonth = new Date().toISOString().split('-')[1];
+    const currentMonth = new Date().toISOString().split('-')[1]; // Hozirgi oyni olish
 
     const user = database[workerId];
     if (!user) {
@@ -343,18 +290,108 @@ async function sendMonthReport(adminId, workerId) {
         return;
     }
 
-    const monthlyAttendance = Object.values(user.attendance).filter(attendance => attendance.kelgan_vaqti);
-    const report = monthlyAttendance.map(attendance => `
-    📅 ${attendance.kelgan_vaqti} - ${attendance.ketgan_vaqti || 'Noma\'lum'}
-    `).join('\n');
+    // Joriy oy uchun qatnovlarni filtrlash
+    const monthlyAttendance = Object.entries(user.attendance)
+        .filter(([date]) => date.split('-')[1] === currentMonth); // Sana orqali oyni tekshiramiz
 
-    bot.sendMessage(adminId, `Oylik hisobot:\n${report}`);
+    if (monthlyAttendance.length === 0) {
+        bot.sendMessage(adminId, "Bu foydalanuvchining joriy oy uchun ma'lumotlari yo'q.");
+        return;
+    }
+
+    let totalWorkedTime = 0; 
+    const report = monthlyAttendance.map(([date, attendance]) => {
+        const startTime = new Date(`${date}T${attendance.kelgan_vaqti}`);
+        const endTime = attendance.ketgan_vaqti ? new Date(`${date}T${attendance.ketgan_vaqti}`) : null;
+        const workedTime = endTime ? (endTime - startTime) / 1000 : 0; 
+        totalWorkedTime += workedTime;
+
+        return ` Ishchi : ${user.name}
+        📅 ${date} (${attendance.kelgan_vaqti} - ${attendance.ketgan_vaqti || 'Noma\'lum'})
+    Ishlangan vaqt: ${workedTime ? formatTime(workedTime) : 'Noma\'lum'}
+    -------------------------------
+    `;
+    }).join('\n');
+
+    const totalWorkedFormatted = formatTime(totalWorkedTime);
+
+    bot.sendMessage(adminId, `Oylik hisobot:\n${report}\n\nUmumiy ishlagan vaqt: ${totalWorkedFormatted}`);
 }
+async function sendAllWorkersMonthReport() {
+    const database = await loadDatabase();
+    const currentMonth = new Date().toISOString().split('-')[1]; // Hozirgi oyni olamiz
 
+    let overallReport = ''; // Umumiy hisobotni yig'ish uchun o'zgaruvchi
 
+    for (const workerId in database) {
+        const user = database[workerId];
+        const attendanceRecords = Object.entries(user.attendance) // `attendance`ni kirish vaqti bilan array formatida olamiz
+            .filter(([date]) => date.split('-')[1] === currentMonth); // Faqat joriy oyni filtrlaymiz
+
+        if (attendanceRecords.length === 0) continue; // Agar oylik ma'lumot bo'lmasa, o'tkazib yuboriladi
+
+        let totalWorkedTime = 0; // Ishlangan umumiy vaqt (soniyalarda)
+        const workerReport = attendanceRecords.map(([date, attendance]) => {
+            const startTime = new Date(`2024-01-01T${attendance.kelgan_vaqti}`); // Vaqtni `Date` formatiga aylantirish
+            const endTime = attendance.ketgan_vaqti ? new Date(`2024-01-01T${attendance.ketgan_vaqti}`) : null;
+
+            const workedTime = endTime ? (endTime - startTime) / 1000 : 0; // Soniyalarda farq
+            totalWorkedTime += workedTime;
+
+            return `
+    📅 ${date}
+    Kelgan vaqti: ${attendance.kelgan_vaqti}
+    Ketgan vaqti: ${attendance.ketgan_vaqti || 'Noma\'lum'}
+    Ishlangan vaqt: ${workedTime ? formatTime(workedTime) : 'Noma\'lum'}
+    Kech qolgan vaqt: ${attendance.kech_qolgan_vaqti || 'Yo\'q'}
+    Erta kelgan vaqt: ${attendance.erta_kelgan_vaqti || 'Yo\'q'}
+    Qo'shimcha ishlangan vaqt: ${attendance.qoshimcha_ishlangan_vaqt || 'Yo\'q'}
+    Kelmaganlik sababi: ${attendance.kelmaganlik_sababi || 'Yo\'q'}
+    `;
+        }).join('\n');
+
+        const totalWorkedFormatted = formatTime(totalWorkedTime);
+
+        overallReport += `
+👤 Ishchi: ${user.name || 'Noma\'lum'}
+Username: @${user.username || 'Noma\'lum'}
+${workerReport}
+Umumiy ishlagan vaqt: ${totalWorkedFormatted}
+
+--------------------------------------
+`;
+    }
+
+    if (overallReport.trim() === '') {
+        bot.sendMessage(ADMIN_ID, "Hech qanday ishchining oylik hisobotlari topilmadi.");
+    } else {
+        bot.sendMessage(ADMIN_ID, `Hamma ishchilarning oylik hisobotlari:\n${overallReport}`);
+    }
+}
+function formatTime(seconds) {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${hours} soat, ${minutes} daqiqa, ${secs} soniya`;
+}
 function isAdmin(userId) {
     return userId === ADMIN_ID;
 }
+schedule.scheduleJob('0 22 * * *', async () => {
+    const today = new Date().toISOString().split('T')[0];
+    const database = await loadDatabase();
+
+    for (const userId in database) {
+        if (!database[userId].attendance[today] || !database[userId].attendance[today].ketgan_vaqti) {
+            database[userId].attendance[today] = database[userId].attendance[today] || {};
+            database[userId].attendance[today].kelmaganlik_sababi = 'Ishga kelmagan';
+        }
+    }
+
+    await saveDatabase(database);
+});
+schedule.scheduleJob('30 9 * * *', () => bot.sendMessage(GROUP_CHAT_ID, "⏰ Siz ishga keldingizmi? Iltimos, /keldim buyrug'ini yuboring!"));
+schedule.scheduleJob('0 20 * * *', () => bot.sendMessage(GROUP_CHAT_ID, "⏰ Ish vaqti tugadi! Iltimos, /ketdim buyrug‘ini yuboring!"));
 
 
 bot.onText("keldim", handleArrival);
@@ -364,5 +401,5 @@ bot.onText("kelmadim", (msg) => {
     handleReason(msg, reason);
 });
 bot.onText("day", sendDailyReport);
-bot.onText("monthly", sendMonthReport);
+bot.onText("monthly", sendAllWorkersMonthReport);
 bot.onText("Hisobot", sendWorkerList);
